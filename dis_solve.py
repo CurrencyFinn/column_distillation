@@ -2,6 +2,7 @@ import math
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import statsmodels.api as sm
 
 # ONLY LOOKING AT BINARY MIXTURES
 
@@ -9,11 +10,12 @@ data = []
 nTray = 1
 
 # Operation settings
-xF= 0.40
-xD= 0.95
-xB= 0.10
+xF= 0.5
+xD= 0.9
+xB= 0.1
 L= 450 #[mol/s] # feed stream liquid phase
 F = 500 #[mol/s]
+optReflux = 1.2
 D = ((xF-xB)/(xD-xB))*F
 B = ((xD-xF)/(xD-xB))*F
 
@@ -57,8 +59,9 @@ def SP_OpeTemp(start,end):
     df.plot(x='Tope', y='pAVG', kind='line', ax=axes[1], xlabel="Operation Temperature [K]", ylabel="Average Pressure [bar]", legend=None)
     fig.tight_layout()
     plt.show(block=True)
+    return
 
-def vapLiqSP(constSP):
+def vapLiqSP(constSP, importdata):
 
     # Minimum amount of trays:
     Nmin = (math.log((xD/(1-xD))/(xB/(1-xB))))/(math.log(constSP))
@@ -67,21 +70,31 @@ def vapLiqSP(constSP):
     Rmin = ((xD/xF)-constSP*((1-xD)/(1-xF)))/(constSP-1)
     
     # Optimum reflux ratio determined on costs:
-    Ropt = 1.2*Rmin
+    Ropt = optReflux*Rmin
 
     # Vapour fraction as a function of liquid fraction using seperation factor
-    liquidX = np.linspace(0,1,100)
-    vapoourY = (constSP*(liquidX))/(1+(constSP-1)*(liquidX))*nTray
-    plt.plot(liquidX, vapoourY, '-b')
-       # data.append(dict(zip(["x","y"],[liquidX/100,vapoourY])))
-    #df = pd.DataFrame(data)
-    #df.plot(x='x', y='y', kind='line', xlabel="Liquid fraction", ylabel="Vapour fraction", legend=None)
+    if importdata == False:
+        intersectEqDiagonal = (constSP*nTray-1)/(constSP-1)
+        if(xD>intersectEqDiagonal):
+            print("xD is out of range, change xD")
+            return
+        liquidX = np.linspace(0,intersectEqDiagonal,100)
+        vapourY = (constSP*liquidX)/(1+(constSP-1)*(liquidX))*nTray
+        plt.plot(liquidX, vapourY, '-b')
+    else:
+    # import data
+        dataEq = pd.read_csv("input.csv")
+        df = pd.DataFrame(dataEq)
+        df.plot(x='x', y='y', kind='line', legend=None)
 
     # Determination of q:
     q=L/F
 
     #Find cross point feed and rectifying
-    XintersectF_D = (xF/(1-q)-xD/(Ropt+1))/(q/(1-q)+Ropt/(Ropt+1))
+    if q==1: # not the clean way
+        XintersectF_D = (xF/(1-0.999999999)-xD/(Ropt+1))/(0.999999999/(1-0.999999999)+Ropt/(Ropt+1))
+    else:
+        XintersectF_D = (xF/(1-q)-xD/(Ropt+1))/(q/(1-q)+Ropt/(Ropt+1))
     YitersectF_D = (1/(Ropt+1))*xD+(Ropt/(Ropt+1))*XintersectF_D
 
     # Rectifying section operation line:
@@ -91,7 +104,7 @@ def vapLiqSP(constSP):
 
     # Feed line:
     if q==1:
-        plt.vlines(x = xF, ymin = xF, ymax = 1, colors = 'purple')
+        plt.vlines(x = xF, ymin = xF, ymax = YitersectF_D, colors = 'purple')
     else:
         xFeedSpace = np.linspace(XintersectF_D,xF,100)
         yFeed = xF/(1-q)+(-q/(1-q))*xFeedSpace
@@ -109,13 +122,14 @@ def vapLiqSP(constSP):
     # Straight line:
     x = np.linspace(0,1,100)
     plt.plot(x, x, '-r')
-
+    plt.xlabel("Liquid fraction")
+    plt.ylabel("Vapour fraction")
     # Number of stages lines:
-    start = xD/(constSP-xD*(constSP-1))
+    start = xD/(constSP*nTray-xD*(constSP-1))
     plt.hlines(y=xD, xmin=start, xmax=xD, color='k')
     YMAX = xD
     counter_var = 0
-    for i in range(0,500): # number of plates in rectifying is end+1
+    for i in range(0,700): # number of plates in rectifying is end+1
         if start<XintersectF_D: # swap over to the stripping section
             if counter_var ==0:
                 print(f"Feed tray location: {i+1}")
@@ -124,7 +138,7 @@ def vapLiqSP(constSP):
             YMAX = slopeStrip*start-intersectStrip*xB
             plt.vlines(x=start,ymax=YMAX,ymin=YMIN, color='k')
             XMAX = start
-            start = YMAX/(constSP-YMAX*(constSP-1))
+            start = YMAX/(constSP*nTray-YMAX*(constSP-1))
             if start<xB:
                 break
             else:
@@ -134,18 +148,22 @@ def vapLiqSP(constSP):
             YMAX = (1/(Ropt+1))*xD+(Ropt/(Ropt+1))*start
             plt.vlines(x=start,ymax=YMAX,ymin=YMIN, color='k')
             XMAX = start
-            start = YMAX/(constSP-YMAX*(constSP-1))
+            start = YMAX/(constSP*nTray-YMAX*(constSP-1))
             plt.hlines(y=YMAX, xmin=start, xmax=XMAX, color='k')
     if start>xB:
         YMIN = YMAX
         YMAX = (1/(Ropt+1))*xD+(Ropt/(Ropt+1))*start
         plt.vlines(x=start,ymax=YMAX,ymin=YMIN, color='k')
-    
-
-    print(f"Minimum number of plates: {round(Nmin,2)}" +"\n" + f"Optimal Reflux Ratio: {round(Ropt,2)}" +"\n" + f"Number of theoretical plates: {i+1}")
-
-    plt.show(block=True)
+    if(i== (0 | 699)):
+        print("Error with plotting graph, check specific options, ntray, xF, xB, xD and constSP")
+        return
+    else:
+        print(f"Minimum number of plates: {round(Nmin,2)}" +"\n" + f"Optimal Reflux Ratio: {round(Ropt,2)}" +"\n" + f"Number of theoretical plates: {i+1}")
+        plt.show(block=True)
+        return
 
 #SP_OpeTemp(300,800)
 
-vapLiqSP(2.5)
+vapLiqSP(2, False)
+
+
