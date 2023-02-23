@@ -14,5 +14,5 @@ On differing seperation factor creates a Mccabe Thiele diagram and prints out al
 * Optimal Reflux Ratio
 * Number of theoretical plates (without reboiler)
 
-![alt text](https://github.com/CurrencyFinn/column_distillation/Figure_1.png?raw=true)
-![alt text](https://github.com/CurrencyFinn/column_distillation/Figure_2.png?raw=true)
+![alt text](https://github.com/CurrencyFinn/column_distillation/blob/master/Figure_1.png?raw=true)
+![alt text](https://github.com/CurrencyFinn/column_distillation/blob/master/Figure_2.png?raw=true)
