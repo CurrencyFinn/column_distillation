@@ -9,7 +9,7 @@ As well as operation temperature as a function of average pressure in the distil
 
 ## vapLiqSP:
 On differing seperation factor creates a Mccabe Thiele diagram and prints out all significant values as:  
-Feed tray location: 9
-Minimum number of plates: 5.61  
-Optimal Reflux Ratio: 1.73      
-Number of theoretical plates (without reboiler): 14
+* Feed tray location
+* Minimum number of plates
+* Optimal Reflux Ratio
+* Number of theoretical plates (without reboiler)
