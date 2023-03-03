@@ -2,35 +2,52 @@ import math
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import statsmodels.api as sm
 
 # ONLY LOOKING AT BINARY MIXTURES
 
 data = []
 nTray = 1
+Emv = 0.7
+Ht = 0.1 #[m]
+
+HvapSteam = 2100 #[kJ/kg]
 
 # Operation settings
-xF= 0.5
-xD= 0.9
-xB= 0.1
-L= 450 #[mol/s] # feed stream liquid phase
-F = 500 #[mol/s]
+xF= 0.03
+xD= 0.28
+xB= 0.01
+L= 93 #[mol/s] # feed stream liquid phase
+F = 93 #[mol/s]
+feedunit = "mol/s"
 optReflux = 1.2
 D = ((xF-xB)/(xD-xB))*F
 B = ((xD-xF)/(xD-xB))*F
 
-
 # Chemicals used
 components = {
-        1: # 1 [Benzene]
-        {"A": 9.2082,
-        "B": 2755.64,
-        "C": -54.00,
+        # 1: # 1 [Benzene]
+        # {"A": 9.2082,
+        # "B": 2755.64,
+        # "C": -54.00,
+        # "Psat": 0},
+        # 2: # 2 [Toluene]
+        # {"A": 9.3716,
+        # "B": 3090.78,
+        # "C": -53.97,
+        # "Psat": 0}
+        1: # 1 [ethanol]
+        {"A": 5.24677,
+        "B": 1598.673,
+        "C": -46.424,
+        "Vap_enthalpy": 40.2, #[kJ/mol]
+        "Mol_weight": 46.07*10**-3, # [kg/mol]
         "Psat": 0},
-        2: # 2 [Toluene]
-        {"A": 9.3716,
-        "B": 3090.78,
-        "C": -53.97,
+        2: # 2 [cyclohexene]
+        {"A": 4.13983,
+        "B": 1316.554,
+        "C": -35.581,
+        "Vap_enthalpy": 31.1, #[kJ/mol]
+        "Mol_weight": 84.16*10**-3, # [kg/mol]
         "Psat": 0}
 }
 
@@ -40,8 +57,10 @@ def SP_OpeTemp(start,end):
     for Tope in range(start,end):
         # Tope given # T[K]
 
-        Psat1=math.exp(components[1]["A"]-components[1]["B"]/(Tope+components[1]["C"]))
-        Psat2=math.exp(components[2]["A"]-components[2]["B"]/(Tope+components[2]["C"]))
+        #Psat1=math.exp(components[1]["A"]-components[1]["B"]/(Tope+components[1]["C"]))
+        #Psat2=math.exp(components[2]["A"]-components[2]["B"]/(Tope+components[2]["C"]))
+        Psat1=10**(components[1]["A"]-components[1]["B"]/(Tope+components[1]["C"]))
+        Psat2=10**(components[2]["A"]-components[2]["B"]/(Tope+components[2]["C"]))
         pTOP = xD*Psat1+(1-xD)*Psat2
         pBOTTOM = xB*Psat1+(1-xB)*Psat2
         pAVG = (pTOP+pBOTTOM)/2
@@ -50,13 +69,14 @@ def SP_OpeTemp(start,end):
         SP=Psat1/Psat2
 
         # Parse values DF
-        data.append(dict(zip(["Tope","SP","pAVG"],[Tope,SP,pAVG])))
+        data.append(dict(zip(["Tope","SP","pAVG", "pTOP", "pBOTTOM"],[Tope,SP,pAVG, pTOP, pBOTTOM])))
 
     df = pd.DataFrame(data)
 
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(5, 3))
     df.plot(x='Tope', y='SP', kind='line', ax=axes[0], xlabel="Operation Temperature [K]", ylabel="Seperation Factor", legend=None)
-    df.plot(x='Tope', y='pAVG', kind='line', ax=axes[1], xlabel="Operation Temperature [K]", ylabel="Average Pressure [bar]", legend=None)
+    #df.plot(x='Tope', y='pAVG', kind='line', ax=axes[1], xlabel="Operation Temperature [K]", ylabel="Average Pressure [bar]", legend=None)
+    #df.plot(x='Tope', y='pTOP', kind='line', ax=axes[1], xlabel="Operation Temperature [K]", ylabel="Pressure at distillate [bar]", legend=None)
     fig.tight_layout()
     plt.show(block=True)
     return
@@ -158,12 +178,31 @@ def vapLiqSP(constSP, importdata):
         print("Error with plotting graph, check specific options, ntray, xF, xB, xD and constSP")
         return
     else:
-        print(f"Minimum number of plates: {round(Nmin,2)}" +"\n" + f"Optimal Reflux Ratio: {round(Ropt,2)}" +"\n" + f"Number of theoretical plates: {i+1}")
+        Nt = (i+1)/Emv-1
+        V_prim_prim = B/intersectStrip
+        EnergyReboiler = xB*V_prim_prim*components[1]["Vap_enthalpy"]+(1-xB)*V_prim_prim*components[2]["Vap_enthalpy"]
+        print(f"Separation factor: {constSP}" + "\n" + f"Stage efficiency: {Emv}" + "\n" + f"Stage height: {Ht} m" + "\n" + f"Minimum number of plates: {round(Nmin,2)}" + "\n" + f"Minimum reflux ratio: {round(Rmin,2)}" +"\n" + f"Optimal Reflux Ratio: {round(Ropt,2)}" +"\n" + f"Number of theoretical plates: {i+1}" + "\n" + f"Actual number of stages: {round(Nt, 2)}" + "\n" + f"Column height: {round(Nt * Ht, 2)} m" + "\n" + f"Energy consumption reboiler: {round(EnergyReboiler, 2)} kJ/s" + "\n" + f"Steam consumption: {round(EnergyReboiler/HvapSteam, 2)} kg/s" "\n" + f"F: {round(F,2)} {feedunit}" + "\n" + f"B: {round(B,2)} {feedunit}" + "\n" + f"D: {round(D, 2)} {feedunit}" + "\n" + f"L': {round(optReflux*D,2)} {feedunit}" + "\n" + f"V': {round((optReflux+1)*D,2)} {feedunit}" + "\n" + f"V'': {round(V_prim_prim, 2)} {feedunit}" + "\n" + f"L'': {round(B/intersectStrip+B, 2)} {feedunit}")
         plt.show(block=True)
         return
 
 #SP_OpeTemp(300,800)
 
-vapLiqSP(2, False)
+vapLiqSP(1.09, False)
+#SP_OpeTemp(200,500)
 
 
+# add from components dict
+
+def plotVap(start, finish):
+    x = np.linspace(start,finish,100)
+    y1 = 10**(5.24677-(1598.673/(x-46.424)))
+    y2 = 10**(4.13983-(1316.554/(x-35.581)))
+    plt.plot(x, y1, '-b', label="ethanol")
+    plt.plot(x, y2, '-g', label="cyclohexane")
+    plt.xlabel("Operation Temperature [K]")
+    plt.ylabel("Vapor Pressure [bar]")
+    plt.legend()
+    plt.show()
+
+#SP_OpeTemp(323,367)
+#plotVap(323,367)
