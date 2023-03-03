@@ -2,13 +2,14 @@ import math
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
 
 # ONLY BINARY MIXTURES
 
 data = []
 naturalAntione = False
 plotGraph = False
-finalPrint = True
+finalPrint = False
 print(f"Plotting graph is set to {str(plotGraph)}")
 
 nTray = 1
@@ -186,9 +187,9 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
         V_prim_prim = B/intersectStrip
         EnergyReboiler = xB*V_prim_prim*components[1]["Vap_enthalpy"]+(1-xB)*V_prim_prim*components[2]["Vap_enthalpy"]
         if finalPrint == True:
-            print(f"Separation factor: {constSP}" + "\n" + f"Stage efficiency: {Emv}" + "\n" + f"Stage height: {Ht} m" + "\n" + f"Minimum number of plates: {round(Nmin,2)}" + "\n" + f"Minimum reflux ratio: {round(Rmin,2)}" +"\n" + f"Optimal Reflux Ratio: {round(Ropt,2)}" +"\n" + f"Feed tray location: {FeedTray}" + "\n" + f"Number of theoretical plates: {i+1}" + "\n" + f"Actual number of stages: {round(Nt, 2)}" + "\n" + f"Column height: {round(Nt * Ht, 2)} m" + "\n" + f"Energy consumption reboiler: {round(EnergyReboiler, 2)} kJ/s" + "\n" + f"Steam consumption: {round(EnergyReboiler/HvapSteam, 2)} kg/s" "\n" + f"F: {round(F,2)} {feedunit}" + "\n" + f"B: {round(B,2)} {feedunit}" + "\n" + f"D: {round(D, 2)} {feedunit}" + "\n" + f"L': {round(optReflux*D,2)} {feedunit}" + "\n" + f"V': {round((optReflux+1)*D,2)} {feedunit}" + "\n" + f"V'': {round(V_prim_prim, 2)} {feedunit}" + "\n" + f"L'': {round(B/intersectStrip+B, 2)} {feedunit}")
+            print(f"Separation factor: {constSP}" + "\n" + f"Stage efficiency: {Emv}" + "\n" + f"q: {round(q,2)}" + "\n" + f"Stage height: {Ht} m" + "\n" + f"Minimum number of plates: {round(Nmin,2)}" + "\n" + f"Minimum reflux ratio: {round(Rmin,2)}" +"\n" + f"Optimal Reflux Ratio: {round(Ropt,2)}" +"\n" + f"Feed tray location: {FeedTray}" + "\n" + f"Number of theoretical plates: {i+1}" + "\n" + f"Actual number of stages: {round(Nt, 2)}" + "\n" + f"Column height: {round(Nt * Ht, 2)} m" + "\n" + f"Energy consumption reboiler: {round(EnergyReboiler, 2)} kJ/s" + "\n" + f"Steam consumption: {round(EnergyReboiler/HvapSteam, 2)} kg/s" "\n" + f"F: {round(F,2)} {feedunit}" + "\n" + f"B: {round(B,2)} {feedunit}" + "\n" + f"D: {round(D, 2)} {feedunit}" + "\n" + f"L': {round(optReflux*D,2)} {feedunit}" + "\n" + f"V': {round((optReflux+1)*D,2)} {feedunit}" + "\n" + f"V'': {round(V_prim_prim, 2)} {feedunit}" + "\n" + f"L'': {round(B/intersectStrip+B, 2)} {feedunit}")
         
-        d = {'SeparationFactor': [constSP], 'xF': [xF], 'xB': [xB],'xD': [xD], 'StageEfficiency': [Emv], 'StageHeight': [Ht], 'TrayEffieciency' :[nTray], "F": [F], 'Nmin' : [round(Nmin,2)], 'Rmin' : [round(Rmin,2)], 'Ropt':[round(Ropt,2)], 'NTheoretical': [i+1], 'NActual' : [round(Nt, 2)], "FeedTray": [FeedTray], "ColumnHeight": [round(Nt * Ht, 2)], "ReboilerEnergyConsumption" : [round(EnergyReboiler, 2)], "SteamConsumption" : [round(EnergyReboiler/HvapSteam, 2)], "B": [round(B,2)],"D": [round(D, 2)], "L'": [round(optReflux*D,2)], "V'": [round((optReflux+1)*D,2)], "V''": [round(V_prim_prim, 2)], "L''": [round(B/intersectStrip+B, 2)]}
+        d = {'SeparationFactor': [constSP], 'xF': [xF], 'xB': [xB],'xD': [xD], 'q':[q], 'StageEfficiency': [Emv], 'StageHeight': [Ht], 'TrayEffieciency' :[nTray], "F": [F], 'Nmin' : [round(Nmin,2)], 'Rmin' : [round(Rmin,2)], 'Ropt':[round(Ropt,2)], 'NTheoretical': [i+1], 'NActual' : [round(Nt, 2)], "FeedTray": [FeedTray], "ColumnHeight": [round(Nt * Ht, 2)], "ReboilerEnergyConsumption" : [round(EnergyReboiler, 2)], "SteamConsumption" : [round(EnergyReboiler/HvapSteam, 2)], "B": [round(B,2)],"D": [round(D, 2)], "L'": [round(optReflux*D,2)], "V'": [round((optReflux+1)*D,2)], "V''": [round(V_prim_prim, 2)], "L''": [round(B/intersectStrip+B, 2)]}
         if columnsFinalDF:
             c = {}
             for i in columnsFinalDF:
@@ -217,9 +218,9 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
 # for i in np.arange(0.01,0.03,0.001):
 #     vapLiqSP(1.09, False, xB=i, xF=xF, xD=xD, F=F, L=L, columnsFinalDF=["xB", "ReboilerEnergyConsumption"])
 
-# df = pd.read_csv("raw_data.csv")
-# df.plot(x='xB', y='ReboilerEnergyConsumption', kind='line')
+# df = pd.read_csv("raw_data_changeQ.csv")
+# df.plot(x='q', y='ReboilerEnergyConsumption', kind='line')
 # plt.show()
-
-vapLiqSP(1.09, False, xB=xB, xF=xF, xD=xD, F=F, L=L)
+# for i in tqdm(np.arange(0,93,0.5)):
+#     vapLiqSP(1.09, False, xB=xB, xF=xF, xD=xD, F=F, L=i)
 #SP_OpeTemp(323,367)
