@@ -9,7 +9,7 @@ from tqdm import tqdm
 data = []
 naturalAntione = False
 plotGraph = True
-finalPrint = False
+finalPrint = True
 print(f"Plotting graph is set to {str(plotGraph)}")
 
 nTray = 0.8
@@ -153,7 +153,9 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
         intersectFeedEquillibriumX = filtered[0]
         intersectFeedEquillibriumY = xF/(1-q)+(-q/(1-q))*intersectFeedEquillibriumX
         RminNew = (intersectFeedEquillibriumY-xD)/(-1*(intersectFeedEquillibriumY+intersectFeedEquillibriumX))
+        SPNew = (xD/xF+RminNew)/(RminNew+((1-xD)/(1-xF)))
         print(Rmin)
+        print(SPNew)
         print(RminNew)
     # Stripping section operation line:
         #Find slope and intersect
