@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 data = []
 naturalAntione = False
-plotGraph = False
+plotGraph = True
 finalPrint = False
 print(f"Plotting graph is set to {str(plotGraph)}")
 
@@ -89,6 +89,9 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
 
     D = ((xF-xB)/(xD-xB))*F
     B = ((xD-xF)/(xD-xB))*F
+
+    
+
     # Minimum amount of trays:
     Nmin = (math.log((xD/(1-xD))/(xB/(1-xB))))/(math.log(constSP))
 
@@ -141,7 +144,17 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
         xFeedSpace = np.linspace(XintersectF_D,xF,100)
         yFeed = xF/(1-q)+(-q/(1-q))*xFeedSpace
         plt.plot(xFeedSpace, yFeed, '-m')
-    
+    # calculate Rmin from intersecting the feedline and the equillibrium curve
+    if importdata != False:
+        unfiltered = np.roots([importdata[3], importdata[2], importdata[1]+(q/(1-q)), importdata[0]-(xF/(1-q))])
+        filtered = [i for i in unfiltered if i.imag == 0]
+        filtered = [i for i in filtered if i >=0]
+        filtered = [i for i in filtered if i <=1]
+        intersectFeedEquillibriumX = filtered[0]
+        intersectFeedEquillibriumY = xF/(1-q)+(-q/(1-q))*intersectFeedEquillibriumX
+        RminNew = (intersectFeedEquillibriumY-xD)/(-1*(intersectFeedEquillibriumY+intersectFeedEquillibriumX))
+        print(Rmin)
+        print(RminNew)
     # Stripping section operation line:
         #Find slope and intersect
     slopeStrip = (YitersectF_D-xB)/(XintersectF_D-xB)
