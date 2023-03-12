@@ -7,25 +7,31 @@ from tqdm import tqdm
 # ONLY BINARY MIXTURES
 
 data = []
+
+# Settings
 naturalAntione = False
 plotGraph = True
 finalPrint = True
-print(f"Plotting graph is set to {str(plotGraph)}")
+print(f"Plotting graph is set to {str(plotGraph)}, Printing is set to {str(finalPrint)}")
 
-nTray = 0.8
-Emv = 0.8
+# Operation settings [1]
+nTray = 1
 Ht = 0.1 #[m]
 
+# Condenser temperatures:
+Tin = 350
+Tout = 300
+Cp = 4.2
 HvapSteam = 2100 #[kJ/kg]
 
-# Operation settings
-xF= 0.03
-xD= 0.395
-xB= 0.01
-L= 99.045 #[mol/s] # feed stream liquid phase
+# Operation settings [2]
+xF= 0.06
+xD= 0.3
+xB= 0.001
+L= 93 #[mol/s] # feed stream liquid phase
 F = 93 #[mol/s]
 feedunit = "mol/s"
-optReflux = 1.2
+optReflux = 1.9
 
 
 # Chemicals used
@@ -50,8 +56,9 @@ components = {
         "Psat": 0}
 }
 
+# SP as function of operation temperature (only ideal mixtures)
 def SP_OpeTemp(start,end):
-    # SP as function of operation temperature
+    
     for Tope in range(start,end):
         # Tope given # T[K]
 
@@ -87,17 +94,44 @@ def SP_OpeTemp(start,end):
 
 def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
 
+    # Determination of distallate and bottom stream:
     D = ((xF-xB)/(xD-xB))*F
     B = ((xD-xF)/(xD-xB))*F
-
     
 
-    # Minimum amount of trays:
-    Nmin = (math.log((xD/(1-xD))/(xB/(1-xB))))/(math.log(constSP))
-
-    # Minimum reflux ratio:
-    Rmin = ((xD/xF)-constSP*((1-xD)/(1-xF)))/(constSP-1)
+    # Determination of q:
+    q=L/F
     
+        
+    
+        # calculate maximum Rmin from intersecting the feedline and the equillibrium curve (ideal with non-ideal eq curve)
+    if importdata != False:
+        if q==1:
+            unfiltered = np.roots([importdata[3], importdata[2], importdata[1]+(0.99999999999/(1-0.99999999999)), importdata[0]-(xF/(1-0.99999999999))])
+        else:
+            unfiltered = np.roots([importdata[3], importdata[2], importdata[1]+(q/(1-q)), importdata[0]-(xF/(1-q))])
+        filtered = [i for i in unfiltered if i.imag == 0]
+        filtered = [i for i in filtered if i >=0]
+        filtered = [i for i in filtered if i <=1]
+        intersectFeedEquillibriumX = filtered[0].real
+        if q==1:
+            intersectFeedEquillibriumY = xF/(1-0.99999999999)+(-0.99999999999/(1-0.99999999999))*intersectFeedEquillibriumX
+        else:
+            intersectFeedEquillibriumY = xF/(1-q)+(-q/(1-q))*intersectFeedEquillibriumX
+        RminNew = (intersectFeedEquillibriumY-xD)/(-1*(intersectFeedEquillibriumY+intersectFeedEquillibriumX))
+        #SPNew = (xD/xF+RminNew)/(RminNew+((1-xD)/(1-xF)))
+        
+
+    if constSP != None:
+        # Minimum amount of trays:
+        Nmin = (math.log((xD/(1-xD))/(xB/(1-xB))))/(math.log(constSP))
+
+        # Minimum reflux ratio:
+        Rmin = ((xD/xF)-constSP*((1-xD)/(1-xF)))/(constSP-1)
+    else:
+        Nmin = None
+        Rmin = RminNew
+        
     # Optimum reflux ratio determined on costs:
     Ropt = optReflux*Rmin
 
@@ -109,21 +143,26 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
             return
         liquidX = np.linspace(0,intersectEqDiagonal,100)
         vapourY = (constSP*liquidX)/(1+(constSP-1)*(liquidX))*nTray
-        plt.plot(liquidX, vapourY, '--b')
         if nTray != 1:
+            plt.plot(liquidX, vapourY, '--b')
             vapourY2 = (importdata[0] + importdata[1]*liquidX + importdata[2]*liquidX**2 + importdata[3]*liquidX**3)
             plt.plot(liquidX, vapourY2, '-b')
+        else:
+            plt.plot(liquidX, vapourY, '-b')
+
     else:
     # import data
         liquidX = np.linspace(0,1,100)
         vapourY = (importdata[0] + importdata[1]*liquidX + importdata[2]*liquidX**2 + importdata[3]*liquidX**3)*nTray
-        plt.plot(liquidX, vapourY, '--b')
+        
         if nTray != 1:
+            plt.plot(liquidX, vapourY, '--b')
             vapourY2 = (importdata[0] + importdata[1]*liquidX + importdata[2]*liquidX**2 + importdata[3]*liquidX**3)
             plt.plot(liquidX, vapourY2, '-b')
+        else:
+            plt.plot(liquidX, vapourY, '-b')
 
-    # Determination of q:
-    q=L/F
+    
 
     #Find cross point feed and rectifying
     if q==1: # not the clean way
@@ -144,19 +183,7 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
         xFeedSpace = np.linspace(XintersectF_D,xF,100)
         yFeed = xF/(1-q)+(-q/(1-q))*xFeedSpace
         plt.plot(xFeedSpace, yFeed, '-m')
-    # calculate Rmin from intersecting the feedline and the equillibrium curve
-    if importdata != False:
-        unfiltered = np.roots([importdata[3], importdata[2], importdata[1]+(q/(1-q)), importdata[0]-(xF/(1-q))])
-        filtered = [i for i in unfiltered if i.imag == 0]
-        filtered = [i for i in filtered if i >=0]
-        filtered = [i for i in filtered if i <=1]
-        intersectFeedEquillibriumX = filtered[0]
-        intersectFeedEquillibriumY = xF/(1-q)+(-q/(1-q))*intersectFeedEquillibriumX
-        RminNew = (intersectFeedEquillibriumY-xD)/(-1*(intersectFeedEquillibriumY+intersectFeedEquillibriumX))
-        SPNew = (xD/xF+RminNew)/(RminNew+((1-xD)/(1-xF)))
-        print(Rmin)
-        print(SPNew)
-        print(RminNew)
+    
     # Stripping section operation line:
         #Find slope and intersect
     slopeStrip = (YitersectF_D-xB)/(XintersectF_D-xB)
@@ -177,11 +204,11 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
     else: 
         unfiltered = np.roots([importdata[3], importdata[2], importdata[1],importdata[0]-xD/nTray])
         filtered = [i for i in unfiltered if i.imag == 0]
-        start = filtered[0]
+        start = filtered[0].real
     plt.hlines(y=xD, xmin=start, xmax=xD, color='k')
     YMAX = xD
     counter_var = 0
-    for i in range(0,700): # number of plates in rectifying is end+1
+    for i in tqdm(range(0,700)): # number of plates in rectifying is end+1
         if start<XintersectF_D: # swap over to the stripping section
             if counter_var ==0:
                 FeedTray = i+1 
@@ -195,7 +222,7 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
             else:
                 unfiltered = np.roots([importdata[3], importdata[2], importdata[1],importdata[0]-YMAX/nTray])
                 filtered = [i for i in unfiltered if i.imag == 0]
-                start = filtered[0]
+                start = filtered[0].real
             if start<xB:
                 break
             else:
@@ -210,54 +237,51 @@ def vapLiqSP(constSP, importdata, xB, xD, xF, F, L, columnsFinalDF=False):
             else:
                 unfiltered = np.roots([importdata[3], importdata[2], importdata[1],importdata[0]-YMAX/nTray])
                 filtered = [i for i in unfiltered if i.imag == 0]
-                start = filtered[0]
+                start = filtered[0].real
             plt.hlines(y=YMAX, xmin=start, xmax=XMAX, color='k')
     if start>xB:
         YMIN = YMAX
         YMAX = (1/(Ropt+1))*xD+(Ropt/(Ropt+1))*start
         plt.vlines(x=start,ymax=YMAX,ymin=YMIN, color='k')
     if(i== (0 | 699)):
-        print("Error with plotting graph, check specific options, ntray, xF, xB, xD and constSP")
+        print("Error with plotting graph, check specific options, ntray, xF, xB, xD. Increase optReflux to check graph")
         return
     else:
-        Nt = (i+2)/Emv-1
         V_prim_prim = B/intersectStrip
+        N= i+2
+        # Energy balances:
+
         EnergyReboiler = xB*V_prim_prim*components[1]["Vap_enthalpy"]+(1-xB)*V_prim_prim*components[2]["Vap_enthalpy"]
+        Qc = D*(Ropt+1)*(xD*-1*components[1]["Vap_enthalpy"]+(1-xD)*-1*components[2]["Vap_enthalpy"])
+        coolWater = Qc/(Cp*(Tout-Tin))
+
         if finalPrint == True:
-            print(f"Separation factor: {constSP}" + "\n" + f"Stage efficiency: {Emv}" + "\n" + f"q: {round(q,3)}" + "\n" + f"Stage height: {Ht} m" + "\n" + f"Minimum number of plates: {round(Nmin,2)}" + "\n" + f"Minimum reflux ratio: {round(Rmin,2)}" +"\n" + f"Optimal Reflux Ratio: {round(Ropt,2)}" +"\n" + f"Feed tray location: {FeedTray}" + "\n" + f"Number of theoretical plates: {i+2}" + "\n" + f"Actual number of stages: {round(Nt, 2)}" + "\n" + f"Column height: {round(Nt * Ht, 2)} m" + "\n" + f"Energy consumption reboiler: {round(EnergyReboiler, 2)} kJ/s" + "\n" + f"Steam consumption: {round(EnergyReboiler/HvapSteam, 2)} kg/s" "\n" + f"F: {round(F,2)} {feedunit}" + "\n" + f"B: {round(B,2)} {feedunit}" + "\n" + f"D: {round(D, 2)} {feedunit}" + "\n" + f"L': {round(optReflux*D,2)} {feedunit}" + "\n" + f"V': {round((optReflux+1)*D,2)} {feedunit}" + "\n" + f"V'': {round(V_prim_prim, 2)} {feedunit}" + "\n" + f"L'': {round(B/intersectStrip+B, 2)} {feedunit}")
-        
-        d = {'SeparationFactor': [constSP], 'xF': [xF], 'xB': [xB],'xD': [xD], 'q':[q], 'StageEfficiency': [Emv], 'StageHeight': [Ht], 'TrayEffieciency' :[nTray], "F": [F], 'Nmin' : [round(Nmin,2)], 'Rmin' : [round(Rmin,2)], 'Ropt':[round(Ropt,2)], 'NTheoretical': [i+2], 'NActual' : [round(Nt, 2)], "FeedTray": [FeedTray], "ColumnHeight": [round(Nt * Ht, 2)], "ReboilerEnergyConsumption" : [round(EnergyReboiler, 2)], "SteamConsumption" : [round(EnergyReboiler/HvapSteam, 2)], "B": [round(B,2)],"D": [round(D, 2)], "L'": [round(optReflux*D,2)], "V'": [round((optReflux+1)*D,2)], "V''": [round(V_prim_prim, 2)], "L''": [round(B/intersectStrip+B, 2)]}
+            print(f"Separation factor: {constSP}" + "\n" + f"q: {round(q,3)}" + "\n" + f"Stage height: {Ht} m" + "\n" + f"Minimum number of plates: {Nmin}" + "\n" + f"Minimum reflux ratio: {round(Rmin,2)}" +"\n" + f"Optimal Reflux Ratio: {round(Ropt,2)}" +"\n" + f"Feed tray location: {FeedTray}" + "\n" + f"Number of theoretical plates: {i+2}" + "\n" + f"Column height: {round(N * Ht, 2)} m" + "\n" + f"Energy consumption reboiler: {round(EnergyReboiler, 2)} kJ/s" + "\n" + f"Cooling water: {round(coolWater, 2)} kg/s" + "\n" + f"Steam consumption: {round(EnergyReboiler/HvapSteam, 2)} kg/s" "\n" + f"F: {round(F,2)} {feedunit}" + "\n" + f"B: {round(B,2)} {feedunit}" + "\n" + f"D: {round(D, 2)} {feedunit}" + "\n" + f"L': {round(optReflux*D,2)} {feedunit}" + "\n" + f"V': {round((optReflux+1)*D,2)} {feedunit}" + "\n" + f"V'': {round(V_prim_prim, 2)} {feedunit}" + "\n" + f"L'': {round(B/intersectStrip+B, 2)} {feedunit}")
+        d = {'SeparationFactor': [constSP], 'xF': [xF], 'xB': [xB],'xD': [xD], 'q':[q], 'StageHeight': [Ht], 'TrayEffieciency' :[nTray], "F": [F], 'Nmin' : [Nmin], 'Rmin' : [round(Rmin,2)], 'Ropt':[round(Ropt,2)], 'NTheoretical': [i+2], "FeedTray": [FeedTray], "ColumnHeight": [round(N * Ht, 2)], "ReboilerEnergyConsumption" : [round(EnergyReboiler, 2)], "SteamConsumption" : [round(EnergyReboiler/HvapSteam, 2)], "CoolWater" : [round(abs(coolWater),2)], "B": [round(B,2)],"D": [round(D, 2)], "L'": [round(optReflux*D,2)], "V'": [round((optReflux+1)*D,2)], "V''": [round(V_prim_prim, 2)], "L''": [round(B/intersectStrip+B, 2)]}
         if columnsFinalDF:
             c = {}
             for i in columnsFinalDF:
                 c[i] = [d[i][0]]
         try:
-            df = pd.read_csv("raw_data.csv")
+            df = pd.read_csv("output\\raw_data.csv")
             if columnsFinalDF:
                 df1= pd.DataFrame(c)
             else:
                 df1= pd.DataFrame(d)
             df2 = pd.concat([df, df1], ignore_index=False)
-            df2.to_csv('raw_data.csv', index=False)
+            df2.to_csv('output\\raw_data.csv', index=False)
         except FileNotFoundError:
             if columnsFinalDF:
                 df = pd.DataFrame(data=c, index=[0])
             else:
                 df = pd.DataFrame(data=d, index=[0])
-            df.to_csv('raw_data.csv', index=False)
+            df.to_csv('output\\raw_data.csv', index=False)
         if plotGraph == True:
             plt.show(block=True)
         else:
             plt.close('all') 
         return
-def SP_X_Y():
-    df = pd.read_csv("data_project\\output.csv")
-    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(5, 5))
-    df.plot.scatter(x='x1', y='y1', color="green", marker="v", ax=axes[0])
-    df.plot.scatter(x='x1', y='y2', ax=axes[0], ylabel="y1")
-    axes[0].legend(["y1", "y2"])
-    df.plot.scatter(x='x1', y='a', ylabel='Seperation Factor', ax=axes[1])
-    plt.show()
+
     #DATA range plotter
 # for i in tqdm(np.arange(0.001,0.03,0.001)):
 #     vapLiqSP(5.34, [0.07951,2.91250,-5.70358,3.49134], xB=i, xF=xF, xD=xD, F=F, L=L, columnsFinalDF=["xB", "D", "ReboilerEnergyConsumption"])
@@ -273,8 +297,8 @@ def SP_X_Y():
 # plt.show()
 # for i in tqdm(np.arange(0,93,0.5)):
 #     vapLiqSP(1.09, False, xB=xB, xF=xF, xD=xD, F=F, L=i)
-#SP_OpeTemp(323,367)
 
-vapLiqSP(5.34, [0.07951,2.91250,-5.70358,3.49134], xB=xB, xF=xF, xD=xD, F=F, L=L)
+
+vapLiqSP(None, [0.07951,2.91250,-5.70358,3.49134], xB=xB, xF=xF, xD=xD, F=F, L=L)
 
 
